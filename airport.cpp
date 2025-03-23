@@ -137,7 +137,6 @@ int main() {
                         int Runway_index = Is_There_An_Empty_Runway_For_Taking_Off(Runways);
                         Aircrafts[Aircraft_index].setLine(Runway_index+1);
                         Runways[Runway_index].setStatus(false);
-                        //cout << "Aircraft ID: " << Aircrafts[Aircraft_index].getID() << " Status: " << Aircrafts[Aircraft_index].getStatus() << " Line: " << Aircrafts[Aircraft_index].getLine() << endl;
                     }
                 }
             }
@@ -156,9 +155,6 @@ int main() {
                 else if(Aircrafts[Aircraft_index].getStatus() == 3) {
                     cout << "YOU ARE LANDING NOW" << endl;
                 }
-                /*else if(Aircrafts[Aircraft_index].getStatus() == 4 && Is_There_An_Empty_Runway_For_Landing(Runways) == -1) {
-                    cout << "NO FREE BAND" << endl;
-                }*/
             }
             else {
                 int Runway_index = Is_There_An_Empty_Runway_For_Landing(Runways);
@@ -167,7 +163,6 @@ int main() {
                     temp.setLine(Runway_index+1);
                     Aircrafts.push_back(temp);
                     Runways[Runway_index].setStatus(false);
-                    //cout << "Aircraft ID: " << temp.getID() << " Status: " << temp.getStatus() << " Line: " << temp.getLine() << endl;
                 }
                 else if(Is_There_An_Empty_Runway_For_Landing(Runways) == -1) {
                     cout << "NO FREE BAND" << endl;
@@ -197,18 +192,5 @@ int main() {
             }
         }
     }
-    /*for(int i = 0; i < Runways.size(); i ++) {
-        cout << "Runway no: " << i+1 << " ";
-        if(Runways[i].getStatus()) {
-            cout << "empty" << endl;
-        }
-        else {
-            cout << "full" << endl;
-        }
-    }
-    cout << "------------------------------" << endl;
-    for(int i = 0; i < Aircrafts.size(); i ++) {
-        cout << "Aircraft ID: " << Aircrafts[i].getID() << "Status: " << Aircrafts[i].getStatus() << endl;
-    }*/
     return 0;
 }
