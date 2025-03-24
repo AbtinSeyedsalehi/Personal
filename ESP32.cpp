@@ -10,7 +10,8 @@ private:
     string Password;
     vector<string> Devices;//devices include: heater, television, air_conditioner, refrigerator
     int Max = 100;
-    vector<string> IP = {};
+    vector<string> Limited_IP = {};
+    vector<string> Connected_IP = {};
 public:
     Accesspoint(string Name, string Password, vector<string> Devices) {
         this->Name = Name;
@@ -26,8 +27,11 @@ public:
     vector<string> getDevices() {
         return this->Devices;
     }
-    vector<string> getIP() {
-        return this->IP;
+    vector<string> getLimited_IP() {
+        return this->Limited_IP;
+    }
+    vector<string> getConnected_IP() {
+        return this->Connected_IP;
     }
     int getMax() {
         return this->Max;
@@ -44,11 +48,37 @@ public:
     void setMax(int Max) {
         this->Max = Max;
     }
-    void setIP(vector <string> IP) {
-        this->IP = IP;
+    void setLimited_IP(vector <string> Limited_IP) {
+        this->Limited_IP = Limited_IP;
+    }
+    void setConnected_IP(vector <string> Connected_IP) {
+        this->Connected_IP = Connected_IP;
     }
 };
-//CAP: create access point functions
+//debug function
+void Debug(vector<Accesspoint> &Accesspoints) {
+    for(int i = 0; i < Accesspoints.size(); i ++) {
+        cout << "Device no" << i+1 << ":" << endl;
+        cout << Accesspoints[i].getName() << " " << Accesspoints[i].getPassword() << endl;
+        for(int j = 0; j < Accesspoints[i].getDevices().size(); j ++) {
+            cout << Accesspoints[i].getDevices()[j] << " ";
+        }
+        cout << endl;
+        cout << "Max Clients: " << Accesspoints[i].getMax() << endl;
+        cout << "Limited IP's: " << endl;
+        for(int j = 0; j < Accesspoints[i].getLimited_IP().size(); j ++) {
+            cout << Accesspoints[i].getLimited_IP()[j] << "  ";
+        }
+        cout << endl;
+        cout << "Connected IP's: " << endl;
+        for(int j = 0; j < Accesspoints[i].getConnected_IP().size(); j ++) {
+            cout << Accesspoints[i].getConnected_IP()[j] << "  ";
+        }
+        cout << endl;
+        cout << "------------------------" << endl;
+    }
+}
+//CAP: create access point, CAP functions
 vector<string> CAP_Command_Extractor(string Command) {
     vector<string> Result;
     int Num = Command.size();
@@ -144,14 +174,6 @@ bool Is_AP_Max_Valid(int Num) {
     }
     return true;
 }
-bool Is_IP_Valid(string IP) {
-    IP.erase(IP.begin(), IP.begin()+12);
-    int temp = stoi(IP);
-    if(temp >= 0 && temp <= 255) {
-        return true;
-    }
-    return false;
-}
 void Turn_APM_Command_To_ML(vector<string> Result, vector<Accesspoint> &Accesspoints) {
     string Name = Result[2];
     int Num = stoi(Result[5]);
@@ -174,11 +196,132 @@ void Turn_APM_IP_Command_To_ML(vector<string> Result, vector<Accesspoint> &Acces
     string IP = Result[2];
     int Accesspoint_Index = Is_AP_Name_Valid(Name, Accesspoints);
     if(Accesspoint_Index != -1) {
-
+        cout << "limitation set" << endl;
+        vector<string> temp_IP = Accesspoints[Accesspoint_Index].getLimited_IP();
+        temp_IP.push_back(IP);
+        Accesspoints[Accesspoint_Index].setLimited_IP(temp_IP);
     }
     else {
         cout << "invalid access point name" << endl;
     }
+}
+//CCAP : connect client to access point, CCAP functions
+vector<string> CCAP_Command_Extractor(string Command) {
+    vector<string> Result;
+    int Num = Command.size();
+    string Word = "";
+    for(int i = 0; i < Num; i++) {
+        if(Command[i] == ' ') {
+            Result.push_back(Word);
+            Word = "";
+            continue;
+        }
+        Word += Command[i];
+    }
+    Result.push_back(Word);
+    return Result;
+}
+bool Is_IP_Valid(string IP) {
+    IP.erase(IP.begin(), IP.begin()+10);
+    int temp = stoi(IP);
+    if(temp >= 0 && temp <= 255) {
+        return true;
+    }
+    return false;
+}
+bool Is_AP_Password_Valid(vector<Accesspoint> &Accesspoints, string Password, int Accesspoint_Index) {
+    if(Accesspoints[Accesspoint_Index].getPassword() == Password) {
+        return true;
+    }
+    return false;
+}
+bool Is_IP_Limited(vector<Accesspoint> &Accesspoints, string IP, int Accesspoint_Index) {
+    for(int i = 0; i < Accesspoints[Accesspoint_Index].getLimited_IP().size(); i ++) {
+        if(Accesspoints[Accesspoint_Index].getLimited_IP()[i] == IP) {
+            return true;
+        }
+    }
+    return false;
+}
+void Turn_CCAP_Command_To_Action(vector<string> Result, vector<Accesspoint> &Accesspoints) {
+    string IP = Result[2];
+    string Name = Result[3];
+    string Password = Result[4];
+    int Accesspoint_Index = Is_AP_Name_Valid(Name, Accesspoints);
+    if(Is_IP_Valid(IP)) {
+        if(Accesspoint_Index != -1) {
+            if(Is_AP_Password_Valid(Accesspoints, Password, Accesspoint_Index)) {
+                if(!Is_IP_Limited(Accesspoints, IP, Accesspoint_Index) && Accesspoints[Accesspoint_Index].getConnected_IP().size() < Accesspoints[Accesspoint_Index].getMax()) {
+                    cout << "client connected successfully" << endl;
+                    vector<string> temp = Accesspoints[Accesspoint_Index].getConnected_IP();
+                    temp.push_back(IP);
+                    Accesspoints[Accesspoint_Index].setConnected_IP(temp);
+                }
+                else {
+                    cout << "can not connect because of limitations" << endl;
+                }
+            }
+            else {
+                cout << "wrong password" << endl;
+            }
+        }
+        else {
+            cout << "invalid access point name" << endl;
+        }
+    }
+    else {
+        cout << "invalid IP" << endl;
+    }
+}
+//APCL: access point client list, APCL functions
+vector<string> APCL_Command_Extractor(string Command) {
+    vector<string> Result;
+    int Num = Command.size();
+    string Word = "";
+    for(int i = 0; i < Num; i++) {
+        if(Command[i] == ' ') {
+            Result.push_back(Word);
+            Word = "";
+            continue;
+        }
+        Word += Command[i];
+    }
+    Result.push_back(Word);
+    return Result;
+}
+void Turn_APCL_Command_To_Action(vector<string> Result, vector<Accesspoint> &Accesspoints) {
+    string Name = Result[2];
+    int Accesspoint_index = Is_AP_Name_Valid(Name, Accesspoints);
+    if(Accesspoint_index != -1) {
+        if(Accesspoints[Accesspoint_index].getConnected_IP().size() != 0) {
+            vector<string> temp = Accesspoints[Accesspoint_index].getConnected_IP();
+            for(int i = 0; i < temp.size(); i ++) {
+                cout << "client" << i+1 << " <" << temp[i] << ">" << endl;
+            }
+        }
+        else {
+            cout << "no client connected yet" << endl;
+        }
+    }
+    else {
+        cout << "invalid access point name" << endl;
+    }
+}
+//DCAP: delete client from access point, DCAP functions
+vector<string> DCAP_Command_Extractor(string Command) {
+    vector<string> Result;
+    int Num = Command.size();
+    string Word = "";
+    for(int i = 0; i < Num; i++) {
+        if(Command[i] == ' ') {
+            Result.push_back(Word);
+            Word = "";
+            continue;
+        }
+        Word += Command[i];
+    }
+    Result.push_back(Word);
+    return Result;
 }
 int main() {
     vector<Accesspoint> Accesspoints;
@@ -186,39 +329,48 @@ int main() {
     regex pattern1(R"(^create Access point (\S+) (\S+)(?: (\S+))*)");//CAP regex
     regex pattern2(R"(access point (\S+) max client (-?\d+))");//APM regex
     regex pattern3(R"(limit client (192\.168\.1\.\d+) from access point (\S+))");//APM-IP regex
+    regex pattern4(R"(connect client (192\.168\.1\.\d+) (\S+) (\S+))");//CCAP regex
+    regex pattern5(R"(access point (\S+) clients list)");//APCL regex
     while(1) {
         string Command;
         getline(cin, Command);
         if(Command == "end") {
             break;
         }
-        if(regex_search(Command, pattern1)) {
-            vector<string> Result = CAP_Command_Extractor(string (Command));
+        else if(regex_search(Command, pattern1)) {
+            vector<string> Result = CAP_Command_Extractor(Command);
             Turn_CAP_Command_To_AP(Result, Accesspoints);
         }
         else if(regex_search(Command, pattern2)) {
-            vector<string> Result = APM_Command_Extractor(string (Command));
+            vector<string> Result = APM_Command_Extractor(Command);
             Turn_APM_Command_To_ML(Result, Accesspoints);
         }
         else if(regex_search(Command, pattern3)) {
-            vector<string> Result = APM_Command_Extractor(string (Command));
-
+            vector<string> Result = APM_Command_Extractor(Command);
+            Turn_APM_IP_Command_To_ML(Result, Accesspoints);
+        }
+        else {
+            cout << "invalid command" << endl;
         }
     }
     // cin debugging process
-    for(int i = 0; i < Accesspoints.size(); i ++) {
-        cout << "Device no" << i+1 << ":" << endl;
-        cout << Accesspoints[i].getName() << " " << Accesspoints[i].getPassword() << endl;
-        for(int j = 0; j < Accesspoints[i].getDevices().size(); j ++) {
-            cout << Accesspoints[i].getDevices()[j] << " ";
-        }
-        cout << endl;
-        cout << Accesspoints[i].getMax() << endl;
-        for(int j = 0; j < Accesspoints[i].getDevices().size(); j ++) {
-            cout << Accesspoints[i].getIP()[j] << "  ";
-        }
-        cout << endl << "------------------------" << endl;
-    }
+    Debug(Accesspoints);
     //loop
+    while(1) {
+        string Command;
+        getline(cin, Command);
+        if(Command == "end") {
+            break;
+        }
+        else if(regex_search(Command, pattern4)) {
+            vector<string> Result = CCAP_Command_Extractor(Command);
+            Turn_CCAP_Command_To_Action(Result, Accesspoints);
+        }
+        else if(regex_search(Command, pattern5)) {
+            vector<string> Result = APCL_Command_Extractor(Command);
+            Turn_APCL_Command_To_Action(Result, Accesspoints);
+        }
+    }
+    Debug(Accesspoints);
     return 0;
 }
