@@ -9,6 +9,8 @@ private:
     string Name;
     string Password;
     vector<string> Devices;//devices include: heater, television, air_conditioner, refrigerator
+    int Max = 100;
+    vector<string> IP = {};
 public:
     Accesspoint(string Name, string Password, vector<string> Devices) {
         this->Name = Name;
@@ -24,6 +26,12 @@ public:
     vector<string> getDevices() {
         return this->Devices;
     }
+    vector<string> getIP() {
+        return this->IP;
+    }
+    int getMax() {
+        return this->Max;
+    }
     void setName(string Name) {
         this->Name = Name;
     }
@@ -32,7 +40,13 @@ public:
     }
     void setDevices(vector <string> Devices) {
         this->Devices = Devices;
-    };
+    }
+    void setMax(int Max) {
+        this->Max = Max;
+    }
+    void setIP(vector <string> IP) {
+        this->IP = IP;
+    }
 };
 //CAP: create access point functions
 vector<string> CAP_Command_Extractor(string Command) {
@@ -99,7 +113,8 @@ void Turn_CAP_Command_To_AP(vector<string> Result, vector<Accesspoint> &Accesspo
         }
     }
 }
-//APM: access point max functions
+//APM: access point max, APM functions
+//APM-IP: access point max IP based, APM-IP functions
 vector<string> APM_Command_Extractor(string Command) {
     vector<string> Result;
     int Num = Command.size();
@@ -115,13 +130,13 @@ vector<string> APM_Command_Extractor(string Command) {
     Result.push_back(Word);
     return Result;
 }
-bool Is_AP_Name_Valid(string Name, vector<Accesspoint> &Accesspoints) {
+int Is_AP_Name_Valid(string Name, vector<Accesspoint> &Accesspoints) {
     for(int i = 0; i < Accesspoints.size(); i ++) {
         if(Accesspoints[i].getName() == Name) {
-            return true;
+            return i;
         }
     }
-    return false;
+    return -1;
 }
 bool Is_AP_Max_Valid(int Num) {
     if(Num < 0) {
@@ -129,11 +144,48 @@ bool Is_AP_Max_Valid(int Num) {
     }
     return true;
 }
+bool Is_IP_Valid(string IP) {
+    IP.erase(IP.begin(), IP.begin()+12);
+    int temp = stoi(IP);
+    if(temp >= 0 && temp <= 255) {
+        return true;
+    }
+    return false;
+}
+void Turn_APM_Command_To_ML(vector<string> Result, vector<Accesspoint> &Accesspoints) {
+    string Name = Result[2];
+    int Num = stoi(Result[5]);
+    int Accesspoint_Index = Is_AP_Name_Valid(Name, Accesspoints);
+    if(Accesspoint_Index != -1) {
+        if(Is_AP_Max_Valid(Num)) {
+            cout << "limitation set" << endl;
+            Accesspoints[Accesspoint_Index].setMax(Num);
+        }
+        else {
+            cout << "number of clients can not be negative" << endl;
+        }
+    }
+    else {
+        cout << "invalid access point name" << endl;
+    }
+}
+void Turn_APM_IP_Command_To_ML(vector<string> Result, vector<Accesspoint> &Accesspoints) {
+    string Name = Result[6];
+    string IP = Result[2];
+    int Accesspoint_Index = Is_AP_Name_Valid(Name, Accesspoints);
+    if(Accesspoint_Index != -1) {
+
+    }
+    else {
+        cout << "invalid access point name" << endl;
+    }
+}
 int main() {
     vector<Accesspoint> Accesspoints;
     //setup
-    regex pattern1(R"(^create Access point (\S+) (\S+)(?: (\S+))*)");
-    regex pattern2(R"(access point (\S+) max client (\d+))");
+    regex pattern1(R"(^create Access point (\S+) (\S+)(?: (\S+))*)");//CAP regex
+    regex pattern2(R"(access point (\S+) max client (-?\d+))");//APM regex
+    regex pattern3(R"(limit client (192\.168\.1\.\d+) from access point (\S+))");//APM-IP regex
     while(1) {
         string Command;
         getline(cin, Command);
@@ -146,16 +198,26 @@ int main() {
         }
         else if(regex_search(Command, pattern2)) {
             vector<string> Result = APM_Command_Extractor(string (Command));
+            Turn_APM_Command_To_ML(Result, Accesspoints);
+        }
+        else if(regex_search(Command, pattern3)) {
+            vector<string> Result = APM_Command_Extractor(string (Command));
 
         }
     }
     // cin debugging process
     for(int i = 0; i < Accesspoints.size(); i ++) {
+        cout << "Device no" << i+1 << ":" << endl;
         cout << Accesspoints[i].getName() << " " << Accesspoints[i].getPassword() << endl;
         for(int j = 0; j < Accesspoints[i].getDevices().size(); j ++) {
             cout << Accesspoints[i].getDevices()[j] << " ";
         }
         cout << endl;
+        cout << Accesspoints[i].getMax() << endl;
+        for(int j = 0; j < Accesspoints[i].getDevices().size(); j ++) {
+            cout << Accesspoints[i].getIP()[j] << "  ";
+        }
+        cout << endl << "------------------------" << endl;
     }
     //loop
     return 0;
