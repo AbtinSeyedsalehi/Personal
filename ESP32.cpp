@@ -55,7 +55,7 @@ public:
         this->Connected_IP = Connected_IP;
     }
 };
-//debug function
+//general functions
 void Debug(vector<Accesspoint> &Accesspoints) {
     for(int i = 0; i < Accesspoints.size(); i ++) {
         cout << "Device no" << i+1 << ":" << endl;
@@ -78,8 +78,7 @@ void Debug(vector<Accesspoint> &Accesspoints) {
         cout << "------------------------" << endl;
     }
 }
-//CAP: create access point, CAP functions
-vector<string> CAP_Command_Extractor(string Command) {
+vector<string> Command_Extractor(string Command) {
     vector<string> Result;
     int Num = Command.size();
     string Word = "";
@@ -94,6 +93,7 @@ vector<string> CAP_Command_Extractor(string Command) {
     Result.push_back(Word);
     return Result;
 }
+//CAP: create access point, CAP functions
 bool Is_AP_Name_Free(Accesspoint temp, vector<Accesspoint> &Accesspoints) {
     for(int i = 0; i < Accesspoints.size(); i ++) {
         if(Accesspoints[i].getName() == temp.getName()) {
@@ -145,21 +145,6 @@ void Turn_CAP_Command_To_AP(vector<string> Result, vector<Accesspoint> &Accesspo
 }
 //APM: access point max, APM functions
 //APM-IP: access point max IP based, APM-IP functions
-vector<string> APM_Command_Extractor(string Command) {
-    vector<string> Result;
-    int Num = Command.size();
-    string Word = "";
-    for(int i = 0; i < Num; i++) {
-        if(Command[i] == ' ') {
-            Result.push_back(Word);
-            Word = "";
-            continue;
-        }
-        Word += Command[i];
-    }
-    Result.push_back(Word);
-    return Result;
-}
 int Is_AP_Name_Valid(string Name, vector<Accesspoint> &Accesspoints) {
     for(int i = 0; i < Accesspoints.size(); i ++) {
         if(Accesspoints[i].getName() == Name) {
@@ -206,21 +191,6 @@ void Turn_APM_IP_Command_To_ML(vector<string> Result, vector<Accesspoint> &Acces
     }
 }
 //CCAP : connect client to access point, CCAP functions
-vector<string> CCAP_Command_Extractor(string Command) {
-    vector<string> Result;
-    int Num = Command.size();
-    string Word = "";
-    for(int i = 0; i < Num; i++) {
-        if(Command[i] == ' ') {
-            Result.push_back(Word);
-            Word = "";
-            continue;
-        }
-        Word += Command[i];
-    }
-    Result.push_back(Word);
-    return Result;
-}
 bool Is_IP_Valid(string IP) {
     IP.erase(IP.begin(), IP.begin()+10);
     int temp = stoi(IP);
@@ -274,21 +244,6 @@ void Turn_CCAP_Command_To_Action(vector<string> Result, vector<Accesspoint> &Acc
     }
 }
 //APCL: access point client list, APCL functions
-vector<string> APCL_Command_Extractor(string Command) {
-    vector<string> Result;
-    int Num = Command.size();
-    string Word = "";
-    for(int i = 0; i < Num; i++) {
-        if(Command[i] == ' ') {
-            Result.push_back(Word);
-            Word = "";
-            continue;
-        }
-        Word += Command[i];
-    }
-    Result.push_back(Word);
-    return Result;
-}
 void Turn_APCL_Command_To_Action(vector<string> Result, vector<Accesspoint> &Accesspoints) {
     string Name = Result[2];
     int Accesspoint_index = Is_AP_Name_Valid(Name, Accesspoints);
@@ -296,7 +251,7 @@ void Turn_APCL_Command_To_Action(vector<string> Result, vector<Accesspoint> &Acc
         if(Accesspoints[Accesspoint_index].getConnected_IP().size() != 0) {
             vector<string> temp = Accesspoints[Accesspoint_index].getConnected_IP();
             for(int i = 0; i < temp.size(); i ++) {
-                cout << "client" << i+1 << " <" << temp[i] << ">" << endl;
+                cout << "client" << i+1 << " " << temp[i] << endl;
             }
         }
         else {
@@ -308,20 +263,34 @@ void Turn_APCL_Command_To_Action(vector<string> Result, vector<Accesspoint> &Acc
     }
 }
 //DCAP: delete client from access point, DCAP functions
-vector<string> DCAP_Command_Extractor(string Command) {
-    vector<string> Result;
-    int Num = Command.size();
-    string Word = "";
-    for(int i = 0; i < Num; i++) {
-        if(Command[i] == ' ') {
-            Result.push_back(Word);
-            Word = "";
-            continue;
+int Is_IP_In_AP(string IP, Accesspoint Accesspoint) {
+    vector<string> temp = Accesspoint.getConnected_IP();
+    for(int i = 0; i < temp.size(); i ++) {
+        if(temp[i] == IP) {
+            return i;
         }
-        Word += Command[i];
     }
-    Result.push_back(Word);
-    return Result;
+    return -1;
+}
+void Turn_DCAP_Command_To_Action(vector<string> Result, vector<Accesspoint> &Accesspoints) {
+    string Name = Result[6];
+    string IP = Result[2];
+    int Accesspoint_index = Is_AP_Name_Valid(Name, Accesspoints);
+    if(Accesspoint_index != -1) {
+        int IP_index = Is_IP_In_AP(IP, Accesspoints[Accesspoint_index]);
+        if(IP_index != -1) {
+            cout << "client deleted" << endl;
+            vector<string> temp = Accesspoints[Accesspoint_index].getConnected_IP();
+            temp.erase(temp.begin()+IP_index);
+            Accesspoints[Accesspoint_index].setConnected_IP(temp);
+        }
+        else {
+            cout << "this IP does not exist in the access point " << Accesspoints[Accesspoint_index].getName() << endl;
+        }
+    }
+    else {
+        cout << "invalid access point name" << endl;
+    }
 }
 int main() {
     vector<Accesspoint> Accesspoints;
@@ -331,6 +300,7 @@ int main() {
     regex pattern3(R"(limit client (192\.168\.1\.\d+) from access point (\S+))");//APM-IP regex
     regex pattern4(R"(connect client (192\.168\.1\.\d+) (\S+) (\S+))");//CCAP regex
     regex pattern5(R"(access point (\S+) clients list)");//APCL regex
+    regex pattern6(R"(delete client (192\.168\.1\.\d+) from access point (\S+))");//DCAP regex
     while(1) {
         string Command;
         getline(cin, Command);
@@ -338,15 +308,15 @@ int main() {
             break;
         }
         else if(regex_search(Command, pattern1)) {
-            vector<string> Result = CAP_Command_Extractor(Command);
+            vector<string> Result = Command_Extractor(Command);
             Turn_CAP_Command_To_AP(Result, Accesspoints);
         }
         else if(regex_search(Command, pattern2)) {
-            vector<string> Result = APM_Command_Extractor(Command);
+            vector<string> Result = Command_Extractor(Command);
             Turn_APM_Command_To_ML(Result, Accesspoints);
         }
         else if(regex_search(Command, pattern3)) {
-            vector<string> Result = APM_Command_Extractor(Command);
+            vector<string> Result = Command_Extractor(Command);
             Turn_APM_IP_Command_To_ML(Result, Accesspoints);
         }
         else {
@@ -363,12 +333,16 @@ int main() {
             break;
         }
         else if(regex_search(Command, pattern4)) {
-            vector<string> Result = CCAP_Command_Extractor(Command);
+            vector<string> Result = Command_Extractor(Command);
             Turn_CCAP_Command_To_Action(Result, Accesspoints);
         }
         else if(regex_search(Command, pattern5)) {
-            vector<string> Result = APCL_Command_Extractor(Command);
+            vector<string> Result = Command_Extractor(Command);
             Turn_APCL_Command_To_Action(Result, Accesspoints);
+        }
+        else if(regex_search(Command, pattern6)) {
+            vector<string> Result = Command_Extractor(Command);
+            Turn_DCAP_Command_To_Action(Result, Accesspoints);
         }
     }
     Debug(Accesspoints);
