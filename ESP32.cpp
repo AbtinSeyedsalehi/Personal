@@ -4,10 +4,10 @@
 #include <regex>
 using namespace std;
 // 00: heater, 01: television, 10: air_conditioner, 11: refrigerator
-/*class Device {
+class Device {
 private:
     string Name;
-    bool Stat;
+    bool Stat;//true: on, false: off
 public:
     Device(string Name, bool Stat) {
         this->Name = Name;
@@ -25,19 +25,18 @@ public:
     void setStat(bool Stat) {
         this->Stat = Stat;
     }
-};*/
+};
 class Accesspoint {
 private:
     string Name;
     string Password;
-    vector<string> Devices;//devices include: heater, television, air_conditioner, refrigerator
-    vector<bool> Devices_Sit; //false: off, true: on
+    vector<Device> Devices;//devices include: heater, television, air_conditioner, refrigerator
     int Max = 100;
     vector<string> Limited_IP = {};
     vector<string> Connected_IP = {};
     vector<int> Repeated_Command = {};
 public:
-    Accesspoint(string Name, string Password, vector<string> Devices) {
+    Accesspoint(string Name, string Password, vector<Device> Devices) {
         this->Name = Name;
         this->Password = Password;
         this->Devices = Devices;
@@ -48,7 +47,7 @@ public:
     string getPassword() {
         return this->Password;
     };
-    vector<string> getDevices() {
+    vector<Device> getDevices() {
         return this->Devices;
     }
     vector<string> getLimited_IP() {
@@ -63,16 +62,13 @@ public:
     int getMax() {
         return this->Max;
     }
-    vector<bool> getDevices_Sit() {
-        return this->Devices_Sit;
-    }
     void setName(string Name) {
         this->Name = Name;
     }
     void setPassword(string Password) {
         this->Password = Password;
     }
-    void setDevices(vector <string> Devices) {
+    void setDevices(vector <Device> Devices) {
         this->Devices = Devices;
     }
     void setMax(int Max) {
@@ -87,24 +83,21 @@ public:
     void setRepeated_Command(vector<int> Repeated_Command) {
         this->Repeated_Command = Repeated_Command;
     }
-    void setDevices_Sit(vector<bool> Devices_Sit) {
-        this->Devices_Sit = Devices_Sit;
-    }
 };
 //general functions
-void Devices_Sit_Reset(Accesspoint Accesspoint) {
-    vector<string> temp = Accesspoint.getDevices();
-    vector<bool> temp1 = Accesspoint.getDevices_Sit();
-    for(int i = 0; i < temp.size(); i ++) {
-        temp1.push_back(false);
-    }
-}
 void Debug(vector<Accesspoint> &Accesspoints) {
     for(int i = 0; i < Accesspoints.size(); i ++) {
-        cout << "Device no" << i+1 << ":" << endl;
+        cout << "AP no" << i+1 << ":" << endl;
         cout << Accesspoints[i].getName() << " " << Accesspoints[i].getPassword() << endl;
         for(int j = 0; j < Accesspoints[i].getDevices().size(); j ++) {
-            cout << Accesspoints[i].getDevices()[j] << " ";
+            cout << Accesspoints[i].getDevices()[j].getName() << " ";
+            if(Accesspoints[i].getDevices()[j].getStat()) {
+                cout << "on";
+            }
+            else {
+                cout << "off";
+            }
+            cout << endl;
         }
         cout << endl;
         cout << "Max Clients: " << Accesspoints[i].getMax() << endl;
@@ -154,8 +147,13 @@ bool Is_AP_Password_Valid(Accesspoint temp) {
 void Turn_CAP_Command_To_AP(vector<string> Result, vector<Accesspoint> &Accesspoints) {
     // checking if we have an open access point(vacant password)
     if(Result[4] == "heater" || Result[4] == "television" || Result[4] == "air_conditioner" || Result[4] == "refrigerator") {
-        Result.erase(Result.begin(), Result.begin()+4);
-        Accesspoint temp = Accesspoint(Result[3], "", vector<string> (Result));
+        vector<Device> temp1;
+        for(int i = 4; i < Result.size(); i ++) {
+            Device temp2 = Device(Result[i], false);
+            temp1.push_back(temp2);
+        }
+        string Name = Result[3];
+        Accesspoint temp = Accesspoint(Name, "", temp1);
         if(Is_AP_Name_Free(temp, Accesspoints)) {
             if(Is_AP_Password_Valid(temp)) {
                 Accesspoints.push_back(temp);
@@ -170,8 +168,14 @@ void Turn_CAP_Command_To_AP(vector<string> Result, vector<Accesspoint> &Accesspo
         }
     }
     else {
-        Result.erase(Result.begin(), Result.begin()+5);
-        Accesspoint temp = Accesspoint(Result[3], Result[4], vector<string> (Result));
+        string Name = Result[3];
+        string Password = Result[4];
+        vector<Device> temp1;
+        for(int i = 5; i < Result.size(); i ++) {
+            Device temp2 = Device(Result[i], false);
+            temp1.push_back(temp2);
+        }
+        Accesspoint temp = Accesspoint(Name, Password, temp1);
         if(Is_AP_Name_Free(temp, Accesspoints)) {
             if(Is_AP_Password_Valid(temp)) {
                 Accesspoints.push_back(temp);
@@ -367,38 +371,62 @@ int Find_AP_with_IP(string IP, vector<Accesspoint> &Accesspoints) {
     return -1;
 }
 int Is_Device_In_AP(string Bin_Device, Accesspoint Accesspoint) {
-    string Device;
+    string Transfered_Device;
     if(Bin_Device == "00") {
-        Device = "heater";
+        Transfered_Device = "heater";
     }
     else if(Bin_Device == "01") {
-        Device = "television";
+        Transfered_Device = "television";
     }
     else if(Bin_Device == "10") {
-        Device = "air_conditioner";
+        Transfered_Device = "air_conditioner";
     }
     else if(Bin_Device == "11") {
-        Device = "refrigerator";
+        Transfered_Device = "refrigerator";
     }
-    vector<string> temp = Accesspoint.getDevices();
+    vector<Device> temp = Accesspoint.getDevices();
     for(int i = 0; i < temp.size(); i ++) {
-        if(Device == temp[i]) {
+        if(Transfered_Device == temp[i].getName()) {
             return i;
         }
     }
     return -1;
 }
-bool Is_On_Or_Off()
-void Turn_RCIP_Prim_To_Action(vector<string> Result, string Bin_Device, vector<Accesspoint> &Accesspoints) {
+void Is_Device_On_Or_Off(Device Device, string Bin_Stat) {
+    bool Current_Stat = Device.getStat();
+    if(Current_Stat) {
+        if(Bin_Stat == "1") {
+            cout << Device.getName() << " was on" << endl;
+        }
+        else {
+            cout << Device.getName() << " turns off" << endl;
+            Device.setStat(false);
+        }
+    }
+    else {
+        if(Bin_Stat == "1") {
+            cout << Device.getName() << " turns on" << endl;
+            Device.setStat(true);
+        }
+        else {
+            cout << Device.getName() << " was off" << endl;
+        }
+    }
+}
+void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Accesspoint> &Accesspoints) {
     string IP = Result[3];
+    string Bin_Stat;
+    string Bin_Device = "";
+    for(int i = 0; i < 2; i ++) {
+        Bin_Device += Bin_Command[i];
+        Bin_Stat = Bin_Command[2];
+    }
     int Accesspoint_index = Find_AP_with_IP(IP, Accesspoints);
     if(Accesspoint_index != -1) {
         int Device_index = Is_Device_In_AP(Bin_Device, Accesspoints[Accesspoint_index]);
-        vector<string> Devices = Accesspoints[Accesspoint_index].getDevices();
-        vector<bool> Devices_Sit = Accesspoints[Accesspoint_index].getDevices_Sit();
+        vector<Device> Devices = Accesspoints[Accesspoint_index].getDevices();
         if(Device_index != -1) {
-            cout << Devices[Device_index] << " " << "turns ";
-
+            Is_Device_On_Or_Off(Devices[Device_index], Bin_Stat);
         }
         else {
             cout << "no such device found" << endl;
@@ -451,6 +479,10 @@ int main() {
         if(Command == "end") {
             break;
         }
+        else if(regex_search(Command, pattern7)) {
+            vector<string> Result = Command_Extractor(Command);
+            Turn_Dis_CAP_To_Action(Result, Accesspoints);
+        }
         else if(regex_search(Command, pattern4)) {
             vector<string> Result = Command_Extractor(Command);
             Turn_CCAP_Command_To_Action(Result, Accesspoints);
@@ -463,15 +495,14 @@ int main() {
             vector<string> Result = Command_Extractor(Command);
             Turn_DCAP_Command_To_Action(Result, Accesspoints);
         }
-        else if(regex_search(Command, pattern7)) {
-            vector<string> Result = Command_Extractor(Command);
-            Turn_Dis_CAP_To_Action(Result, Accesspoints);
-        }
         else if(regex_search(Command, pattern8)) {
-            string Bin_Device;
-            cin >> Bin_Device;
+            string Bin_Command;
+            cin >> Bin_Command;
             vector<string> Result = Command_Extractor(Command);
-
+            Turn_RCIP_To_Action(Result, Bin_Command, Accesspoints);
+        }
+        else {
+            cout << "invalid command" << endl;
         }
     }
     Debug(Accesspoints);
