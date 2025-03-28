@@ -47,7 +47,7 @@ public:
     string getPassword() {
         return this->Password;
     };
-    vector<Device> getDevices() {
+    vector<Device>& getDevices() {
         return this->Devices;
     }
     vector<string> getLimited_IP() {
@@ -239,6 +239,13 @@ void Turn_APM_IP_Command_To_ML(vector<string> Result, vector<Accesspoint> &Acces
 }
 //CCAP : connect client to access point, CCAP functions
 bool Is_IP_Valid(string IP) {
+    string Prim_IP = "";
+    for(int i = 0; i < 10; i ++) {
+        Prim_IP += IP[i];
+    }
+    if(Prim_IP != "192.168.1.") {
+        return false;
+    }
     IP.erase(IP.begin(), IP.begin()+10);
     int temp = stoi(IP);
     if(temp >= 0 && temp <= 255) {
@@ -247,7 +254,10 @@ bool Is_IP_Valid(string IP) {
     return false;
 }
 bool Is_AP_Password_Valid(vector<Accesspoint> &Accesspoints, string Password, int Accesspoint_Index) {
-    if(Accesspoints[Accesspoint_Index].getPassword() == Password) {
+    if(Accesspoints[Accesspoint_Index].getPassword() == "") {
+        return true;
+    }
+    else if(Accesspoints[Accesspoint_Index].getPassword() == Password) {
         return true;
     }
     return false;
@@ -263,8 +273,14 @@ bool Is_IP_Limited(vector<Accesspoint> &Accesspoints, string IP, int Accesspoint
 void Turn_CCAP_Command_To_Action(vector<string> Result, vector<Accesspoint> &Accesspoints) {
     string IP = Result[2];
     string Name = Result[3];
-    string Password = Result[4];
+    string Password;
     int Accesspoint_Index = Is_AP_Name_Valid(Name, Accesspoints);
+    if(Accesspoints[Accesspoint_Index].getPassword() == "") {
+        Password = "";
+    }
+    else {
+        Password = Result[4];
+    }
     if(Is_IP_Valid(IP)) {
         if(Accesspoint_Index != -1) {
             if(Is_AP_Password_Valid(Accesspoints, Password, Accesspoint_Index)) {
@@ -392,7 +408,7 @@ int Is_Device_In_AP(string Bin_Device, Accesspoint Accesspoint) {
     }
     return -1;
 }
-void Is_Device_On_Or_Off(Device Device, string Bin_Stat) {
+void Is_Device_On_Or_Off(Device &Device, string Bin_Stat) {
     bool Current_Stat = Device.getStat();
     if(Current_Stat) {
         if(Bin_Stat == "1") {
@@ -424,7 +440,7 @@ void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Acces
     int Accesspoint_index = Find_AP_with_IP(IP, Accesspoints);
     if(Accesspoint_index != -1) {
         int Device_index = Is_Device_In_AP(Bin_Device, Accesspoints[Accesspoint_index]);
-        vector<Device> Devices = Accesspoints[Accesspoint_index].getDevices();
+        vector<Device>& Devices = Accesspoints[Accesspoint_index].getDevices();
         if(Device_index != -1) {
             Is_Device_On_Or_Off(Devices[Device_index], Bin_Stat);
         }
@@ -436,47 +452,52 @@ void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Acces
         cout << "invalid IP" << endl;
     }
 }
+//RS: recognizing spam, RS functions
+
 int main() {
     vector<Accesspoint> Accesspoints;
     //setup
-    regex pattern1(R"(^create Access point (\S+) (\S+)(?: (\S+))*)");//CAP regex
+    regex pattern1(R"(create Access point (\S+) (\S+)(?: (\S+))*)");//CAP regex
     regex pattern2(R"(access point (\S+) max client (-?\d+))");//APM regex
     regex pattern3(R"(limit client (192\.168\.1\.\d+) from access point (\S+))");//APM-IP regex
-    regex pattern4(R"(connect client (192\.168\.1\.\d+) (\S+) (\S+))");//CCAP regex
+    regex pattern4(R"(connect client ((?:\d{1,3}\.){3}\d{1,3}) (\S+) (\S+))"); // CCAP regex
     regex pattern5(R"(access point (\S+) clients list)");//APCL regex
     regex pattern6(R"(delete client (192\.168\.1\.\d+) from access point (\S+))");//DCAP regex
     regex pattern7(R"(disconnect client (192\.168\.1\.\d+) from access point (\S+))");//Dis_CAP regex
     regex pattern8(R"(read from client (192\.168\.1\.\d+))");//RCIP regex
-
+    regex pattern0(R"(000||001||010||011||100||101||110||111)");
+    string Command_1;
+    int counter = 0;
     while(1) {
-        string Command;
-        getline(cin, Command);
-        if(Command == "end") {
-            break;
-        }
-        else if(regex_search(Command, pattern1)) {
-            vector<string> Result = Command_Extractor(Command);
+        getline(cin, Command_1);
+        if(regex_search(Command_1, pattern1)) {
+            vector<string> Result = Command_Extractor(Command_1);
             Turn_CAP_Command_To_AP(Result, Accesspoints);
+            counter ++;
         }
-        else if(regex_search(Command, pattern2)) {
-            vector<string> Result = Command_Extractor(Command);
+        else if(regex_search(Command_1, pattern2)) {
+            vector<string> Result = Command_Extractor(Command_1);
             Turn_APM_Command_To_ML(Result, Accesspoints);
+            counter ++;
         }
-        else if(regex_search(Command, pattern3)) {
-            vector<string> Result = Command_Extractor(Command);
+        else if(regex_search(Command_1, pattern3)) {
+            vector<string> Result = Command_Extractor(Command_1);
             Turn_APM_IP_Command_To_ML(Result, Accesspoints);
+            counter ++;
+        }
+        else if((regex_search(Command_1, pattern4) || regex_search(Command_1, pattern5) ||regex_search(Command_1, pattern6) || regex_search(Command_1, pattern7) || regex_search(Command_1, pattern8))&& counter != 0) {
+            break;
         }
         else {
             cout << "invalid command" << endl;
         }
     }
     // cin debugging process
-    Debug(Accesspoints);
+    //Debug(Accesspoints);
+    string Command = Command_1;
     //loop
     while(1) {
-        string Command;
-        getline(cin, Command);
-        if(Command == "end") {
+        if(Command == "exit") {
             break;
         }
         else if(regex_search(Command, pattern7)) {
@@ -501,9 +522,13 @@ int main() {
             vector<string> Result = Command_Extractor(Command);
             Turn_RCIP_To_Action(Result, Bin_Command, Accesspoints);
         }
+        else if(regex_search(Command, pattern0) && !regex_search(Command, pattern1) && !regex_search(Command, pattern2) && !regex_search(Command, pattern3)) {
+            bool n;
+        }
         else {
             cout << "invalid command" << endl;
         }
+        getline(cin, Command);
     }
     Debug(Accesspoints);
     return 0;
