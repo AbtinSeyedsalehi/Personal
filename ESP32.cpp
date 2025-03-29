@@ -137,13 +137,29 @@ bool Is_AP_Password_Valid(Accesspoint temp) {
     }
     return false;
 }
-void Turn_CAP_Command_To_AP(vector<string> Result, vector<Accesspoint> &Accesspoints) {
+int heater_counter = 0;
+int television_counter = 0;
+int air_conditioner_counter = 0;
+int refrigerator_counter = 0;
+void Turn_CAP_Command_To_AP(vector<string> Result, vector<Accesspoint> &Accesspoints, int &heater_counter, int &television_counter, int &air_conditioner_counter, int &refrigerator_counter) {
     // checking if we have an open access point(vacant password)
     if(Result[4] == "heater" || Result[4] == "television" || Result[4] == "air_conditioner" || Result[4] == "refrigerator") {
         vector<Device> temp1;
         for(int i = 4; i < Result.size(); i ++) {
             Device temp2 = Device(Result[i], false);
             temp1.push_back(temp2);
+            if(Result[i] == "heater") {
+                heater_counter ++;
+            }
+            else if(Result[i] == "television") {
+                television_counter ++;
+            }
+            else if(Result[i] == "air_conditioner") {
+                air_conditioner_counter ++;
+            }
+            else if(Result[i] == "refrigerator") {
+                refrigerator_counter ++;
+            }
         }
         string Name = Result[3];
         Accesspoint temp = Accesspoint(Name, "", temp1);
@@ -167,6 +183,18 @@ void Turn_CAP_Command_To_AP(vector<string> Result, vector<Accesspoint> &Accesspo
         for(int i = 5; i < Result.size(); i ++) {
             Device temp2 = Device(Result[i], false);
             temp1.push_back(temp2);
+            if(Result[i] == "heater") {
+                heater_counter ++;
+            }
+            else if(Result[i] == "television") {
+                television_counter ++;
+            }
+            else if(Result[i] == "air_conditioner") {
+                air_conditioner_counter ++;
+            }
+            else if(Result[i] == "refrigerator") {
+                refrigerator_counter ++;
+            }
         }
         Accesspoint temp = Accesspoint(Name, Password, temp1);
         if(Is_AP_Name_Free(temp, Accesspoints)) {
@@ -469,6 +497,7 @@ void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Acces
                 vector<string> temp_1 = Accesspoints[Accesspoint_index].getConnected_IP();
                 temp_1.erase(temp_1.begin()+IP_index);
                 Accesspoints[Accesspoint_index].setConnected_IP(temp_1);
+                Spam_Counter = 1;
             }
             else {
                 Is_Device_On_Or_Off(Devices[Device_index], Bin_Stat);
@@ -499,15 +528,16 @@ int main() {
     regex pattern8(R"(read from client (192\.168\.1\.\d+))");//RCIP regex
     regex pattern0(R"(000||001||010||011||100||101||110||111)");
     string Command_1;
-    int Counter = 0;
+    // 00: heater, 01: television, 10: air_conditioner, 11: refrigerator
+    int heater_counter = 0;
+    int television_counter = 0;
+    int air_conditioner_counter = 0;
+    int refrigerator_counter = 0;
     while(1) {
         getline(cin, Command_1);
         if(regex_search(Command_1, pattern1)) {
             vector<string> Result = Command_Extractor(Command_1);
-            Turn_CAP_Command_To_AP(Result, Accesspoints);
-            if(Accesspoints.size() != 0) {
-                Counter ++;
-            }
+            Turn_CAP_Command_To_AP(Result, Accesspoints, heater_counter, television_counter, air_conditioner_counter, refrigerator_counter);
         }
         else if(regex_search(Command_1, pattern2)) {
             vector<string> Result = Command_Extractor(Command_1);
@@ -517,7 +547,7 @@ int main() {
             vector<string> Result = Command_Extractor(Command_1);
             Turn_APM_IP_Command_To_ML(Result, Accesspoints);
         }
-        else if((regex_search(Command_1, pattern4) || regex_search(Command_1, pattern5) ||regex_search(Command_1, pattern6) || regex_search(Command_1, pattern7) || regex_search(Command_1, pattern8))&& (Counter > 0)) {
+        else if((regex_search(Command_1, pattern4) || regex_search(Command_1, pattern5) ||regex_search(Command_1, pattern6) || regex_search(Command_1, pattern7) || regex_search(Command_1, pattern8)) && (television_counter >= 1) && (refrigerator_counter >= 1) && (heater_counter >= 1) && (air_conditioner_counter >= 1)) {
             break;
         }
         else {
