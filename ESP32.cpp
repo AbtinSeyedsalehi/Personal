@@ -34,7 +34,6 @@ private:
     int Max = 100;
     vector<string> Limited_IP = {};
     vector<string> Connected_IP = {};
-    vector<int> Repeated_Command = {};
 public:
     Accesspoint(string Name, string Password, vector<Device> Devices) {
         this->Name = Name;
@@ -56,9 +55,6 @@ public:
     vector<string> getConnected_IP() {
         return this->Connected_IP;
     }
-    vector<int> getRepeated_Command() {
-        return this->Repeated_Command;
-    }
     int getMax() {
         return this->Max;
     }
@@ -79,9 +75,6 @@ public:
     }
     void setConnected_IP(vector <string> Connected_IP) {
         this->Connected_IP = Connected_IP;
-    }
-    void setRepeated_Command(vector<int> Repeated_Command) {
-        this->Repeated_Command = Repeated_Command;
     }
 };
 //general functions
@@ -271,20 +264,29 @@ bool Is_IP_Limited(vector<Accesspoint> &Accesspoints, string IP, int Accesspoint
     return false;
 }
 void Turn_CCAP_Command_To_Action(vector<string> Result, vector<Accesspoint> &Accesspoints) {
+    //cout << Result.size() << endl;
     string IP = Result[2];
     string Name = Result[3];
     string Password;
+    if(Result.size() == 5) {
+        Password = Result[4];
+    }
+    else {
+        Password = "";
+    }
+    //cout << Password << endl;
     int Accesspoint_Index = Is_AP_Name_Valid(Name, Accesspoints);
-    if(Accesspoints[Accesspoint_Index].getPassword() == "") {
+    //cout << Accesspoints[Accesspoint_Index].getPassword() << endl;
+    /*if(Accesspoints[Accesspoint_Index].getPassword() == "") {
         Password = "";
     }
     else {
         Password = Result[4];
-    }
+    }*/
     if(Is_IP_Valid(IP)) {
         if(Accesspoint_Index != -1) {
             if(Is_AP_Password_Valid(Accesspoints, Password, Accesspoint_Index)) {
-                if(!Is_IP_Limited(Accesspoints, IP, Accesspoint_Index) && Accesspoints[Accesspoint_Index].getConnected_IP().size() < Accesspoints[Accesspoint_Index].getMax()) {
+                if((!Is_IP_Limited(Accesspoints, IP, Accesspoint_Index)) && (Accesspoints[Accesspoint_Index].getConnected_IP().size() < Accesspoints[Accesspoint_Index].getMax())) {
                     cout << "client connected successfully" << endl;
                     vector<string> temp = Accesspoints[Accesspoint_Index].getConnected_IP();
                     temp.push_back(IP);
@@ -429,7 +431,15 @@ void Is_Device_On_Or_Off(Device &Device, string Bin_Stat) {
         }
     }
 }
-void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Accesspoint> &Accesspoints) {
+int Find_IP_In_AP(string IP, Accesspoint Accesspoint) {
+    for(int i = 0; i < Accesspoint.getConnected_IP().size(); i ++) {
+        if(IP == Accesspoint.getConnected_IP()[i]) {
+            return i;
+        }
+    }
+    return -1;
+}
+void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Accesspoint> &Accesspoints, string &Last_Device, int &Spam_Counter) {
     string IP = Result[3];
     string Bin_Stat;
     string Bin_Device = "";
@@ -442,7 +452,27 @@ void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Acces
         int Device_index = Is_Device_In_AP(Bin_Device, Accesspoints[Accesspoint_index]);
         vector<Device>& Devices = Accesspoints[Accesspoint_index].getDevices();
         if(Device_index != -1) {
-            Is_Device_On_Or_Off(Devices[Device_index], Bin_Stat);
+            Last_Device = Accesspoints[Accesspoint_index].getDevices()[Device_index].getName();
+            if(Accesspoints[Accesspoint_index].getDevices()[Device_index].getName() == Last_Device) {
+                Spam_Counter ++;
+            }
+            else {
+                Spam_Counter = 1;
+                Last_Device = Accesspoints[Accesspoint_index].getDevices()[Device_index].getName();
+            }
+            if(Spam_Counter == 6) {
+                cout << "client " << IP << " banned due to spam" << endl;
+                vector<string> temp = Accesspoints[Accesspoint_index].getLimited_IP();
+                temp.push_back(IP);
+                Accesspoints[Accesspoint_index].setLimited_IP(temp);
+                int IP_index = Find_IP_In_AP(IP, Accesspoints[Accesspoint_index]);
+                vector<string> temp_1 = Accesspoints[Accesspoint_index].getConnected_IP();
+                temp_1.erase(temp_1.begin()+IP_index);
+                Accesspoints[Accesspoint_index].setConnected_IP(temp_1);
+            }
+            else {
+                Is_Device_On_Or_Off(Devices[Device_index], Bin_Stat);
+            }
         }
         else {
             cout << "no such device found" << endl;
@@ -455,37 +485,39 @@ void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Acces
 //RS: recognizing spam, RS functions
 
 int main() {
+    string Last_Device;
+    int Spam_Counter = 1;
     vector<Accesspoint> Accesspoints;
     //setup
     regex pattern1(R"(create Access point (\S+) (\S+)(?: (\S+))*)");//CAP regex
     regex pattern2(R"(access point (\S+) max client (-?\d+))");//APM regex
     regex pattern3(R"(limit client (192\.168\.1\.\d+) from access point (\S+))");//APM-IP regex
-    regex pattern4(R"(connect client ((?:\d{1,3}\.){3}\d{1,3}) (\S+) (\S+))"); // CCAP regex
+    regex pattern4(R"(connect client ((?:\d{1,3}\.){3}\d{1,3}) (\S+)(?: (\S+))?)");//CCAP regex
     regex pattern5(R"(access point (\S+) clients list)");//APCL regex
     regex pattern6(R"(delete client (192\.168\.1\.\d+) from access point (\S+))");//DCAP regex
     regex pattern7(R"(disconnect client (192\.168\.1\.\d+) from access point (\S+))");//Dis_CAP regex
     regex pattern8(R"(read from client (192\.168\.1\.\d+))");//RCIP regex
     regex pattern0(R"(000||001||010||011||100||101||110||111)");
     string Command_1;
-    int counter = 0;
+    int Counter = 0;
     while(1) {
         getline(cin, Command_1);
         if(regex_search(Command_1, pattern1)) {
             vector<string> Result = Command_Extractor(Command_1);
             Turn_CAP_Command_To_AP(Result, Accesspoints);
-            counter ++;
+            if(Accesspoints.size() != 0) {
+                Counter ++;
+            }
         }
         else if(regex_search(Command_1, pattern2)) {
             vector<string> Result = Command_Extractor(Command_1);
             Turn_APM_Command_To_ML(Result, Accesspoints);
-            counter ++;
         }
         else if(regex_search(Command_1, pattern3)) {
             vector<string> Result = Command_Extractor(Command_1);
             Turn_APM_IP_Command_To_ML(Result, Accesspoints);
-            counter ++;
         }
-        else if((regex_search(Command_1, pattern4) || regex_search(Command_1, pattern5) ||regex_search(Command_1, pattern6) || regex_search(Command_1, pattern7) || regex_search(Command_1, pattern8))&& counter != 0) {
+        else if((regex_search(Command_1, pattern4) || regex_search(Command_1, pattern5) ||regex_search(Command_1, pattern6) || regex_search(Command_1, pattern7) || regex_search(Command_1, pattern8))&& (Counter > 0)) {
             break;
         }
         else {
@@ -520,7 +552,7 @@ int main() {
             string Bin_Command;
             cin >> Bin_Command;
             vector<string> Result = Command_Extractor(Command);
-            Turn_RCIP_To_Action(Result, Bin_Command, Accesspoints);
+            Turn_RCIP_To_Action(Result, Bin_Command, Accesspoints, Last_Device, Spam_Counter);
         }
         else if(regex_search(Command, pattern0) && !regex_search(Command, pattern1) && !regex_search(Command, pattern2) && !regex_search(Command, pattern3)) {
             bool n;
@@ -530,6 +562,6 @@ int main() {
         }
         getline(cin, Command);
     }
-    Debug(Accesspoints);
+    //Debug(Accesspoints);
     return 0;
 }
