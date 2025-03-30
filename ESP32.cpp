@@ -34,6 +34,8 @@ private:
     int Max = 100;
     vector<string> Limited_IP = {};
     vector<string> Connected_IP = {};
+    string Last_Device = "";
+    string Last_IP = "";
 public:
     Accesspoint(string Name, string Password, vector<Device> Devices) {
         this->Name = Name;
@@ -58,6 +60,12 @@ public:
     int getMax() {
         return this->Max;
     }
+    string getLast_Device() {
+        return this->Last_Device;
+    }
+    string getLast_IP() {
+        return this->Last_IP;
+    }
     void setName(string Name) {
         this->Name = Name;
     }
@@ -75,6 +83,12 @@ public:
     }
     void setConnected_IP(vector <string> Connected_IP) {
         this->Connected_IP = Connected_IP;
+    }
+    void setLast_Device(string Last_Device) {
+        this->Last_Device = Last_Device;
+    }
+    void setLast_IP(string Last_IP) {
+        this->Last_IP = Last_IP;
     }
 };
 //general functions
@@ -292,7 +306,6 @@ bool Is_IP_Limited(vector<Accesspoint> &Accesspoints, string IP, int Accesspoint
     return false;
 }
 void Turn_CCAP_Command_To_Action(vector<string> Result, vector<Accesspoint> &Accesspoints) {
-    //cout << Result.size() << endl;
     string IP = Result[2];
     string Name = Result[3];
     string Password;
@@ -302,15 +315,7 @@ void Turn_CCAP_Command_To_Action(vector<string> Result, vector<Accesspoint> &Acc
     else {
         Password = "";
     }
-    //cout << Password << endl;
     int Accesspoint_Index = Is_AP_Name_Valid(Name, Accesspoints);
-    //cout << Accesspoints[Accesspoint_Index].getPassword() << endl;
-    /*if(Accesspoints[Accesspoint_Index].getPassword() == "") {
-        Password = "";
-    }
-    else {
-        Password = Result[4];
-    }*/
     if(Is_IP_Valid(IP)) {
         if(Accesspoint_Index != -1) {
             if(Is_AP_Password_Valid(Accesspoints, Password, Accesspoint_Index)) {
@@ -467,7 +472,21 @@ int Find_IP_In_AP(string IP, Accesspoint Accesspoint) {
     }
     return -1;
 }
-void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Accesspoint> &Accesspoints, string &Last_Device, int &Spam_Counter) {
+string Turn_Bin_Device_To_Name(string Bin_Device) {
+    if(Bin_Device == "00") {
+        return "heater";
+    }
+    else if(Bin_Device == "01") {
+        return "television";
+    }
+    else if(Bin_Device == "10") {
+        return "air_conditioner";
+    }
+    else if(Bin_Device == "11") {
+        return "refrigerator";
+    }
+}
+void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Accesspoint> &Accesspoints, vector<int> &Spam_IP) {
     string IP = Result[3];
     string Bin_Stat;
     string Bin_Device = "";
@@ -478,29 +497,31 @@ void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Acces
     int Accesspoint_index = Find_AP_with_IP(IP, Accesspoints);
     if(Accesspoint_index != -1) {
         int Device_index = Is_Device_In_AP(Bin_Device, Accesspoints[Accesspoint_index]);
-        vector<Device>& Devices = Accesspoints[Accesspoint_index].getDevices();
         if(Device_index != -1) {
-            Last_Device = Accesspoints[Accesspoint_index].getDevices()[Device_index].getName();
-            if(Accesspoints[Accesspoint_index].getDevices()[Device_index].getName() == Last_Device) {
-                Spam_Counter ++;
+            int IP_index = Find_IP_In_AP(IP, Accesspoints[Accesspoint_index]);
+            string Device_Name = Turn_Bin_Device_To_Name(Bin_Device);
+            if((Device_Name == Accesspoints[Accesspoint_index].getLast_Device()) && (IP == Accesspoints[Accesspoint_index].getLast_IP())) {
+                Spam_IP[IP_index] ++;
+                Accesspoints[Accesspoint_index].setLast_Device(Device_Name);
+                Accesspoints[Accesspoint_index].setLast_IP(IP);
             }
             else {
-                Spam_Counter = 1;
-                Last_Device = Accesspoints[Accesspoint_index].getDevices()[Device_index].getName();
+                Spam_IP[IP_index] = 1;
+                Accesspoints[Accesspoint_index].setLast_Device(Device_Name);
+                Accesspoints[Accesspoint_index].setLast_IP(IP);
             }
-            if(Spam_Counter == 6) {
+            if(Spam_IP[IP_index] == 5) {
                 cout << "client " << IP << " banned due to spam" << endl;
                 vector<string> temp = Accesspoints[Accesspoint_index].getLimited_IP();
                 temp.push_back(IP);
                 Accesspoints[Accesspoint_index].setLimited_IP(temp);
-                int IP_index = Find_IP_In_AP(IP, Accesspoints[Accesspoint_index]);
                 vector<string> temp_1 = Accesspoints[Accesspoint_index].getConnected_IP();
                 temp_1.erase(temp_1.begin()+IP_index);
                 Accesspoints[Accesspoint_index].setConnected_IP(temp_1);
-                Spam_Counter = 1;
+                Spam_IP[IP_index] = 1;
             }
             else {
-                Is_Device_On_Or_Off(Devices[Device_index], Bin_Stat);
+                Is_Device_On_Or_Off(Accesspoints[Accesspoint_index].getDevices()[Device_index], Bin_Stat);
             }
         }
         else {
@@ -511,10 +532,7 @@ void Turn_RCIP_To_Action(vector<string> Result, string Bin_Command, vector<Acces
         cout << "invalid IP" << endl;
     }
 }
-//RS: recognizing spam, RS functions
-
 int main() {
-    string Last_Device;
     int Spam_Counter = 1;
     vector<Accesspoint> Accesspoints;
     //setup
@@ -556,6 +574,7 @@ int main() {
     }
     // cin debugging process
     //Debug(Accesspoints);
+    vector<int> Spam_IP(Accesspoints.size(), 0);
     string Command = Command_1;
     //loop
     while(1) {
@@ -582,7 +601,7 @@ int main() {
             string Bin_Command;
             cin >> Bin_Command;
             vector<string> Result = Command_Extractor(Command);
-            Turn_RCIP_To_Action(Result, Bin_Command, Accesspoints, Last_Device, Spam_Counter);
+            Turn_RCIP_To_Action(Result, Bin_Command, Accesspoints, Spam_IP);
         }
         else if(regex_search(Command, pattern0) && !regex_search(Command, pattern1) && !regex_search(Command, pattern2) && !regex_search(Command, pattern3)) {
             bool n;
