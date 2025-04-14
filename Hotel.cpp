@@ -29,12 +29,16 @@ private:
     int lenghtofstay = 0;
     int totalcost = 0;
     int usedservicescount = 0;
+    bool isactive = false;
 public:
     Guest(string firstname, string lastname, string ID, string phonenumber) {
         this->firstname = firstname;
         this->lastname = lastname;
         this->ID = ID;
         this->phonenumber = phonenumber;
+    }
+    void setisActive(bool isactive) {
+        this->isactive = isactive;
     }
     void addtoUsedServicesCount(int add) {this->usedservicescount += add;}
     void addToTotalCost(int add) {this->totalcost += add;}
@@ -46,6 +50,7 @@ public:
     int getLengthofStay() {return this->lenghtofstay;}
     int getTotalCost() {return this->totalcost;}
     int getUsedServicesCount() {return this->usedservicescount;}
+    bool getisActive() {return this->isactive;}
 };
 class Service {
 private:
@@ -71,6 +76,7 @@ private:
     bool isAvailable = true;
     string assignedspecialservice = "";
     int price = 0;
+    bool isSpecial = false;
     Guest guest = Guest("", "", "", "");
 public:
     Room(string ID, string type, int bedsnumber) {
@@ -78,6 +84,7 @@ public:
         this-> type = type;
         this-> bedsnumber = bedsnumber;
     }
+    bool getSpecialty() {return this->isSpecial;};
     Guest getGuest() {return this->guest;}
     string getAssignedSpecialService() {return this->assignedspecialservice;}
     bool getAvailablity() {return this->isAvailable;}
@@ -93,6 +100,11 @@ public:
     void setAvailablity(bool isAvailable) {this->isAvailable = isAvailable;}
     void setGuest(Guest guest) {this->guest = guest;}
     void setAssignedSpecialService(string assignedspecialservice) {this->assignedspecialservice = assignedspecialservice;}
+    void setSpecialty(bool isSpecial) {this->isSpecial = isSpecial;}
+    void resetGuest() {
+        Guest temp = Guest("", "", "", "");
+        this->guest = temp;
+    }
 };
 //=======controller=======
 class ProgramController {
@@ -151,7 +163,7 @@ public:
     }
     int findRoom(Room temp) {
         for(int i = 0; i < rooms.size(); i ++) {
-            if(rooms[i].getID() == temp.getID() && rooms[i].getAvailablity()) {
+            if(rooms[i].getID() == temp.getID()) {
                 return i;
             }
         }
@@ -177,7 +189,7 @@ public:
             cout << "guest " << temp.getID() << " has been registered already" << endl;
         }
     }
-    void assignTypetoService(Service temp) {
+    void assignTypetoService(Service &temp) {
         if(temp.getName() == "Haunted Call") {
             temp.setisSpecial(true);
             temp.setBaseCost(15);
@@ -248,20 +260,29 @@ public:
             cout << "manager " << temp1.getID() << " is not registered" << endl;
         }
     }
-    void assignTypeToRoom(Room temp) {
+    void assignTypeToRoom(Room &temp) {
         if(temp.getType() == "Coffin Retreat") {
+            temp.setSpecialty(true);
             temp.setAssignedSpecialService("Haunted Call");
+            Service temp1 = Service("Haunted Call");
+            services.push_back(temp1);
             temp.setPrice(50);
         }
         else if(temp.getType() == "Dungeon Royal") {
             temp.setPrice(80);
         }
         else if(temp.getType() == "Count's Suite") {
+            temp.setSpecialty(true);
             temp.setAssignedSpecialService("Vampire Dining");
+            Service temp1 = Service("Vampire Dining");
+            services.push_back(temp1);
             temp.setPrice(150);
         }
         else if(temp.getType() == "Haunted Chamber") {
+            temp.setSpecialty(true);
             temp.setAssignedSpecialService("Mystic Encounter");
+            Service temp1 = Service("Mystic Encounter");
+            services.push_back(temp1);
             temp.setPrice(90);
         }
         else if(temp.getType() == "Shadow Penthouse") {
@@ -289,7 +310,7 @@ public:
         int roomindex = findRoom(temp);
         int managerindex = findManager(temp1);
         if(managerindex != -1) {
-            if(roomindex != -1) {
+            if(roomindex != -1 && rooms[roomindex].getAvailablity()) {
                 if(!rooms[roomindex].getOccupation()) {
                     rooms[roomindex].setAvailablity(false);
                     cout << "room " << rooms[roomindex].getID() << " with type of " << rooms[roomindex].getType() << " has been removed successfully" << endl;
@@ -310,11 +331,13 @@ public:
         int guestindex = findGuest(temp);
         int roomindex = findRoom(temp1);
         if((guestindex != -1) && (temp.getFirstName() == guests[guestindex].getFirstName()) && (temp.getLastName() == guests[guestindex].getLastName())) {
-            if(roomindex != -1) {
+            if(roomindex != -1 && rooms[roomindex].getAvailablity()) {
                 if(!rooms[roomindex].getOccupation() && rooms[roomindex].getAvailablity()) {
                     guests[guestindex].setLengthofStay(lengthofstay);
                     rooms[roomindex].setOccupation(true);
                     rooms[roomindex].setGuest(guests[guestindex]);
+                    guests[guestindex].addToTotalCost(rooms[roomindex].getPrice() * guests[guestindex].getLengthofStay());
+                    guests[guestindex].setisActive(true);
                     cout << "guest " << temp.getFirstName() << " " << temp.getLastName() << " with ID " << temp.getID() << " has been checked in successfully" << endl;
                 }
                 else  {
@@ -329,90 +352,49 @@ public:
             cout << "guest " << temp.getFirstName() << " " << temp.getLastName() << " with ID " << temp.getID() << " has not been registered yet" << endl;
         }
     }
-    int findRoomWithoutSpecialServices() {
-        for(int i = 0; i < rooms.size(); i ++) {
-            if(rooms[i].getAssignedSpecialService() == "" && rooms[i].getAvailablity()) {
-                return i;
-            }
-        }
-        return -1;
+    static bool compareRoomsByID(Room &a, Room &b) {
+        return a.getID() < b.getID();
     }
-    int findRoomWithLeastPrice() {
-        int index = 0;
-        vector<int> indexes;
-        for(int i = 1; i < rooms.size(); i ++) {
-            if(rooms[i].getPrice() < rooms[index].getPrice()) {
-                index = i;
-            }
-        }
-        for(int i = 1; i < rooms.size(); i ++) {
-            if(rooms[i].getPrice() == rooms[index].getPrice()) {
-                indexes.push_back(i);
-            }
-        }
-        for(int i = 0; i < indexes.size(); i ++) {
-            if(!rooms[indexes[i]].getOccupation() && rooms[indexes[i]].getAvailablity()) {
-                return indexes[i];
-            }
-        }
-        return -1;
-    }
-    //this function should be changed
-    void sortRoomsbasedOnLexicograpghy() {
-        vector<string> roomIDs;
-        for(int i = 0; i < rooms.size(); i ++) {
-            roomIDs.push_back(rooms[i].getID());
-        }
-        vector<Room> newrooms;
-        sort(roomIDs.begin(), roomIDs.end());
-        for(int i = 0; i < roomIDs.size(); i ++) {
-            for(int j = 0; j < rooms.size(); j ++) {
-                if(roomIDs[i] == rooms[j].getID()) {
-                    newrooms.push_back(rooms[j]);
-                    break;
-                }
-            }
-        }
-        this->rooms = newrooms;
-        /*for(int i = 0; i < rooms.size(); i ++) {
-            cout << rooms[i].getID() << endl;
-        }*/
-    }
-    int findEmptyRoom() {
-        for(int i = 0; i < this->rooms.size(); i ++) {
-            if(!rooms[i].getOccupation() && rooms[i].getAvailablity()) {
-                return i;
-            }
-        }
-        return -1;
+    void sortRoomsByID() {
+        sort(rooms.begin(), rooms.end(), compareRoomsByID);
     }
     int findRoomforReserve() {
-        if(findRoomWithoutSpecialServices() != -1 && rooms[findRoomWithoutSpecialServices()].getAvailablity()) {
-            return findRoomWithoutSpecialServices();
-        }
-        else {
-            if(findRoomWithLeastPrice() != -1 && rooms[findRoomWithLeastPrice()].getAvailablity()) {//can take errors
-                return findRoomWithLeastPrice();
-            }
-            else {
-                sortRoomsbasedOnLexicograpghy();
-                int roomindex = findEmptyRoom();
-                if(roomindex != -1 && rooms[roomindex].getAvailablity()) {
-                    return roomindex;
-                }
-                else {
-                    return -1;
-                }
+        sortRoomsByID();
+        for(int i = 0; i < rooms.size(); i ++) {
+            if(!rooms[i].getSpecialty() && rooms[i].getAvailablity() && !rooms[i].getOccupation()) {
+                return i;
             }
         }
+        int minprice = INT_MAX;
+        int roomindex = -1;
+        for(int i = 0; i < rooms.size(); i ++) {
+            if(rooms[i].getPrice() < minprice && !rooms[i].getSpecialty()) {
+                minprice = rooms[i].getPrice();
+            }
+        }
+        for(int i = 0; i < rooms.size(); i ++) {
+            if(rooms[i].getPrice() == minprice && !rooms[i].getOccupation() && rooms[i].getAvailablity() && !rooms[i].getSpecialty()) {
+                roomindex = i;
+            }
+        }
+        if(roomindex != -1) {
+            return roomindex;
+        }
+        for(int i = 0; i < rooms.size(); i ++) {
+            if(!rooms[i].getOccupation() && rooms[i].getAvailablity()) {
+                roomindex = i;
+            }
+        }
+        return roomindex;
     }
     void CheckInWithoutReserve(Guest temp, int lengthofstay, int roomindex) {
         int guestindex = findGuest(temp);
-        if(guestindex != -1) {
+        if(guestindex != -1 && guests[guestindex].getFirstName() == temp.getFirstName() && guests[guestindex].getLastName() == temp.getLastName()) {
             if(roomindex != -1) {
-                cout << "guest " << guests[guestindex].getFirstName() << " " << guests[guestindex].getLastName() << " with ID " << guests[guestindex].getID() << "has been checked into room " << rooms[roomindex].getID() << endl;
+                cout << "guest " << guests[guestindex].getFirstName() << " " << guests[guestindex].getLastName() << " with ID " << guests[guestindex].getID() << " has been checked into room " << rooms[roomindex].getID() << endl;
                 rooms[roomindex].setOccupation(true);
                 guests[guestindex].setLengthofStay(lengthofstay);
+                guests[guestindex].setisActive(true);
                 rooms[roomindex].setGuest(guests[guestindex]);
             }
             else {
@@ -436,9 +418,10 @@ public:
         if((guestindex != -1) && (temp.getFirstName() == guests[guestindex].getFirstName()) && (temp.getLastName() == guests[guestindex].getLastName())) {
             if(guests[guestindex].getLengthofStay() != 0) {
                 int roomindex = findRoomWithGuestID(temp.getID());
-                rooms[roomindex].setGuest(guests[guestindex]);
+                rooms[roomindex].resetGuest();
                 rooms[roomindex].setOccupation(false);
-                cout << "guest with ID " << temp.getID() << " has checked out with a cost of " << temp.getTotalCost() << endl;
+                guests[guestindex].setisActive(false);
+                cout << "guest with ID " << guests[guestindex].getID() << " has checked out with a cost of " << guests[guestindex].getTotalCost() << endl;
             }
             else {
                 cout << "person " << temp.getID() << " is not a guest" << endl;
@@ -451,12 +434,14 @@ public:
     void useService(Service temp, Guest temp1) {
         int guestindex = findGuest(temp1);
         int serviceindex = findService(temp);
-        if(guestindex != -1) {
+        if(guestindex != -1 && guests[guestindex].getisActive()) {
             if(serviceindex != -1) {
-                cout << "guest " << temp1.getID() << " has used the service " << temp.getName() << " successfully" << endl;
+                cout << "guest " << guests[guestindex].getID() << " has used the service " << services[serviceindex].getName() << " successfully" << endl;
+                guests[guestindex].addtoUsedServicesCount(1);
+                guests[guestindex].addToTotalCost(services[serviceindex].getBaseCost());
             }
             else {
-                cout << "service " << services[serviceindex].getName() << " does not exist" << endl;
+                cout << "service " << temp.getName() << " does not exist" << endl;
             }
         }
         else {
@@ -495,6 +480,35 @@ public:
             cout << "room " << temp.getID() << " does not exist" << endl;
         }
     }
+    void showRooms() {
+        for(int i = 0; i < rooms.size(); i ++) {
+            cout << rooms[i].getID() << " " << rooms[i].getType() << " ";
+            if(rooms[i].getAvailablity() && !rooms[i].getOccupation()) {
+                cout << "available ";
+            }
+            else {
+                cout << "unavailable ";
+            }
+            if(rooms[i].getSpecialty()) {
+                cout << "special ";
+            }
+            else {
+                cout << "normal ";
+            }
+            cout << rooms[i].getPrice() << endl;
+        }
+    }
+    void showServices() {
+        for(int i = 0; i < services.size(); i ++) {
+            cout << services[i].getName() << " " << services[i].getBaseCost() << " ";
+            if(services[i].getisSpecial()) {
+                cout << "special " << endl;
+            }
+            else {
+                cout << "normal " << endl;
+            }
+        }
+    }
 };
 int main() {
     ProgramController PC;
@@ -503,18 +517,23 @@ int main() {
     regex pattern1("(^register guest \\S+ \\S+ with ID \\S+ and phone number \\S+$)");
     regex pattern2("(^add service (.+) by manager \\S+$)");
     regex pattern3("(^remove service (.+) by manager \\S+$)");
-    regex pattern4("(^add room \\S+ \\S+ \\d+ by manager \\S+$)");
+    regex pattern4("(^add room \\S+ (.+) \\d+ by manager \\S+$)");
     regex pattern5("(^remove room \\S+ by manager \\S+$)");
     regex pattern6("(^check in guest \\S+ \\S+ \\S+ in room \\S+ for \\d+ nights$)");
     regex pattern7("(^check in guest \\S+ \\S+ \\S+ for \\d+ nights$)");
     regex pattern8("(^check out guest \\S+ \\S+ \\S+$)");
-    regex pattern9("(^use service \\S+ by guest \\S+$)");
+    regex pattern9("(^use service (.+) by guest \\S+$)");
     regex pattern10("(^show guest information \\S+$)");
     regex pattern11("(^show room information \\S+$)");
-    regex pattern12("(^$)");
-    regex pattern13("(^$)");
-    regex pattern14("(^$)");
-    regex pattern15("(^$)");
+    regex pattern22("(^show rooms$)");
+    regex pattern23("(^show services$)");
+    //new parts
+    regex pattern12("(^show the most popular room type$)");
+    regex pattern13("(^show the most frequent service$)");
+    regex pattern14("(^show the total income of hotel$)");
+    regex pattern15("(^show the total income from rooms$)");
+    regex pattern16("(^show the total income from services$)");
+    regex pattern17("(^show the (services||rooms) based on (use||income||use and income)$)");
     while(1) {
         string line;
         getline(cin, line);
@@ -586,8 +605,31 @@ int main() {
             PC.removeNormalService(temp, temp1);
         }
         else if(regex_search(line, pattern4)) {
-            Room temp = Room(PC.Extractor(line)[2], PC.Extractor(line)[3], stoi(PC.Extractor(line)[4]));
-            Manager temp1 = Manager("", "", PC.Extractor(line)[7]);
+            int startindex, finishindex;
+            for(int i = 0; i < PC.Extractor(line).size(); i ++) {
+                if(PC.Extractor(line)[i] == "room") {
+                    startindex = i;
+                }
+                else if(PC.Extractor(line)[i] == "by") {
+                    finishindex = i;
+                }
+            }
+            string type = "";
+            for(int i = startindex+2; i < finishindex-1; i ++) {
+                type += PC.Extractor(line)[i];
+                if(i != finishindex-2) {
+                    type += " ";
+                }
+            }
+            int IDindex;
+            for(int i = 0; i < PC.Extractor(line).size(); i ++) {
+                if(PC.Extractor(line)[i] == "manager") {
+                    IDindex = i;
+                    break;
+                }
+            }
+            Room temp = Room(PC.Extractor(line)[2], type, stoi(PC.Extractor(line)[finishindex-1]));
+            Manager temp1 = Manager("", "", PC.Extractor(line)[IDindex+1]);
             PC.addRoom(temp, temp1);
         }
         else if(regex_search(line, pattern5)) {
@@ -612,8 +654,31 @@ int main() {
             PC.CheckOut(temp);
         }
         else if(regex_search(line, pattern9)) {
-            Service temp = Service(PC.Extractor(line)[2]);
-            Guest temp1 = Guest("", "", PC.Extractor(line)[5], "");
+            int startindex, finishindex;
+            for(int i = 0; i < PC.Extractor(line).size(); i ++) {
+                if(PC.Extractor(line)[i] == "service") {
+                    startindex = i;
+                }
+                else if(PC.Extractor(line)[i] == "by") {
+                    finishindex = i;
+                }
+            }
+            string name = "";
+            for(int i = startindex+1; i < finishindex; i ++) {
+                name += PC.Extractor(line)[i];
+                if(i != finishindex-1) {
+                    name += " ";
+                }
+            }
+            int IDindex;
+            for(int i = 0; i < PC.Extractor(line).size(); i ++) {
+                if(PC.Extractor(line)[i] == "guest") {
+                    IDindex = i;
+                    break;
+                }
+            }
+            Service temp = Service(name);
+            Guest temp1 = Guest("", "", PC.Extractor(line)[IDindex+1], "");
             PC.useService(temp, temp1);
         }
         else if(regex_search(line, pattern10)) {
@@ -624,8 +689,11 @@ int main() {
             Room temp = Room(PC.Extractor(line)[3], "", 0);
             PC.showRoomInfo(temp);
         }
-        else if(line == "sort") {
-            PC.sortRoomsbasedOnLexicograpghy();
+        else if(regex_search(line, pattern22)) {
+            PC.showRooms();
+        }
+        else if(regex_search(line, pattern23)) {
+            PC.showServices();
         }
     }
     return 0;
